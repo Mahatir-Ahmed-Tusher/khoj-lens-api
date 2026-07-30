@@ -118,7 +118,12 @@ async def search_google_lens(url: Optional[str] = None, file_bytes: Optional[byt
                     })
 
                 logger.info(f"SerpApi Google Lens search successful with Key #{index}. Found {len(formatted_matches)} visual matches.")
-                return {"visual_matches": formatted_matches}
+                return {
+                    "visual_matches": formatted_matches,
+                    "raw": formatted_matches,
+                    "results": formatted_matches
+                }
+
 
             elif resp.status_code in (401, 402, 403, 429):
                 logger.warning(f"SerpApi Key #{index} returned HTTP {resp.status_code}. Rotating to next key...")
