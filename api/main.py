@@ -120,8 +120,18 @@ async def search(
     Returns JSON mapping engine -> result (or error).
     """
 
-    if not image_url and not file:
-        raise HTTPException(status_code=400, detail="Either image_url or file must be provided")
+    # Sanitize and validate image_url input
+    if image_url:
+        image_url = image_url.strip()
+        if image_url.lower() in ("string", "") or not (image_url.startswith("http://") or image_url.startswith("https://")):
+            image_url = None
+
+    if not image_url and (file is None or not file.filename):
+        raise HTTPException(
+            status_code=400, 
+            detail="Either a valid image_url (starting with http:// or https://) or an uploaded file must be provided"
+        )
+
 
     if engines == "all":
         engine_list = list(ENGINE_MAP.keys())
@@ -152,6 +162,17 @@ async def search(
     return JSONResponse(out)
 
 
+@app.get("/")
+async def root():
+    return {
+        "status": "ok",
+        "message": "Welcome to Khoj Lens API!",
+        "docs": "/docs",
+        "health": "/health"
+    }
+
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
