@@ -4,16 +4,16 @@ from typing import Optional, Any
 import os
 import asyncio
 import traceback
+from dotenv import load_dotenv
 
-# Import the library's public classes
-# Note: This wrapper expects PicImageSearch package to be available in the environment.
-# If your repo includes PicImageSearch as a submodule or dependency, ensure it's installed.
+load_dotenv()
+
+# Import public classes from PicImageSearch (excluding GoogleLens which uses SerpApi)
 from PicImageSearch import (
     Network,
     SauceNAO,
     Yandex,
     Bing,
-    GoogleLens,
     TraceMoe,
     Tineye,
     Ascii2D,
@@ -24,6 +24,7 @@ from PicImageSearch import (
     Lenso,
     AnimeTrace,
 )
+from api.google_lens import search_google_lens
 
 app = FastAPI(title="PicimageSearch API")
 
@@ -32,7 +33,6 @@ ENGINE_MAP = {
     "saucenao": SauceNAO,
     "yandex": Yandex,
     "bing": Bing,
-    "google_lens": GoogleLens,
     "tracemoe": TraceMoe,
     "tineye": Tineye,
     "ascii2d": Ascii2D,
@@ -43,6 +43,8 @@ ENGINE_MAP = {
     "lenso": Lenso,
     "animetrace": AnimeTrace,
 }
+
+ALL_SUPPORTED_ENGINES = ["google_lens"] + list(ENGINE_MAP.keys())
 
 # Helper: turn objects into JSON-serializable data
 def to_primitive(obj: Any):
@@ -66,22 +68,22 @@ def to_primitive(obj: Any):
 
 async def run_engine_search(engine_name: str, engine_kwargs: dict, url: Optional[str], file_bytes: Optional[bytes]):
     """Instantiate engine and run search. Returns (engine_name, result_or_error)."""
-    cls = ENGINE_MAP.get(engine_name.lower())
+    engine_key = engine_name.lower()
+
+    # Intercept Google Lens request to use custom SerpApi + ImgBB module
+    if engine_key == "google_lens":
+        res = await search_google_lens(url=url, file_bytes=file_bytes)
+        return engine_name, res
+
+    cls = ENGINE_MAP.get(engine_key)
     if cls is None:
         return engine_name, {"error": f"Unsupported engine: {engine_name}"}
 
     # Merge environment-provided API keys into engine kwargs when present
     # e.g., SAUCENAO_API_KEY -> api_key
-    # Common patterns: <ENGINE>_API_KEY
-    env_key = os.getenv(engine_name.upper() + "_API_KEY")
+    env_key = os.getenv(engine_key.upper() + "_API_KEY")
     if env_key and "api_key" not in engine_kwargs:
         engine_kwargs["api_key"] = env_key
-
-    # For Google Lens the repo uses `cookies` param in demos
-    if engine_name.lower() == "google_lens":
-        google_cookies = os.getenv("GOOGLE_COOKIES")
-        if google_cookies:
-            engine_kwargs.setdefault("cookies", google_cookies)
 
     # If proxies are provided globally, pass them
     proxies = os.getenv("PROXIES")
@@ -90,11 +92,9 @@ async def run_engine_search(engine_name: str, engine_kwargs: dict, url: Optional
 
     try:
         engine = cls(**engine_kwargs)
-        # If the engine's search method expects async, call it directly (it is async)
         if url:
             resp = await engine.search(url=url)
         else:
-            # pass raw bytes; library accepts bytes for `file`
             resp = await engine.search(file=file_bytes)
         return engine_name, to_primitive(resp)
     except Exception as e:
@@ -132,11 +132,11 @@ async def search(
             detail="Either a valid image_url (starting with http:// or https://) or an uploaded file must be provided"
         )
 
-
     if engines == "all":
-        engine_list = list(ENGINE_MAP.keys())
+        engine_list = ALL_SUPPORTED_ENGINES
     else:
         engine_list = [e.strip() for e in engines.split(",") if e.strip()]
+
 
     file_bytes = None
     if file is not None:
