@@ -1,0 +1,28 @@
+# Ignore Python build and runtime artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+venv/
+.build/
+dist/
+*.egg-info/
+
+# Git
+.git
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Tests
+.vscode/
+pytest_cache/
+
+# Docker
+docker-compose.override.yml
+
