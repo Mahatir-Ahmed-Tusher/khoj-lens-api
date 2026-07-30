@@ -1,0 +1,5 @@
+fastapi>=0.100.0
+uvicorn[standard]>=0.20.0
+python-multipart>=0.0.6
+PicImageSearch>=2.5.0
+loguru>=0.7.0
